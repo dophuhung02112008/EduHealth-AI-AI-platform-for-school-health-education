@@ -1,0 +1,8 @@
+{
+  "name": "EduHealth AI - Trợ lý Sức khỏe Học đường",
+  "description": "Một ứng dụng AI hỗ trợ học sinh và phụ huynh nhận biết sớm các dấu hiệu sức khỏe phổ biến, hướng dẫn xử trí an toàn và giáo dục ý thức phòng bệnh.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
