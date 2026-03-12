@@ -708,7 +708,7 @@ const callChat = async (text: string) => {
             {mapMode !== 'idle' && (
                <div className="bg-white rounded-[3rem] p-2 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-500 overflow-hidden">
                   <div className="h-[500px] w-full relative bg-slate-100 rounded-[2.8rem] overflow-hidden" ref={mapContainerRef}>
-                     <div id="map"></div>
+                     <div id="map" className="h-full w-full"></div>
 
                      <div className="absolute top-8 left-8 right-8 flex justify-between items-start z-[10] pointer-events-none">
                         <div className="bg-white/95 backdrop-blur-md px-6 py-3 rounded-3xl shadow-2xl border border-slate-100 text-sm font-black uppercase tracking-widest text-slate-600 flex items-center gap-3">
