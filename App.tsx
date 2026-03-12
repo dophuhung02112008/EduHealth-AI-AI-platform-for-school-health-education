@@ -10,7 +10,7 @@ import {
   Users, Activity, Zap, Eye, Pill, Map as MapIcon
 } from 'lucide-react';
 import { UrgencyLevel, HealthCase, HealbookTopic, UserRole, ChatMessage } from './types';
-import { GoogleGenAI, Type } from "@google/genai";
+
 
 // Declare Leaflet globally since it's loaded via script tag
 declare var L: any;
@@ -263,99 +263,83 @@ const App: React.FC = () => {
     }
   };
 
-  const callAI = async () => {
-    if (!inputText && !selectedImage) return;
-    setLoading(true);
-    setAiResult(null);
-    setShowHeatmap(false);
-    try {
-      const ai = new GoogleGenAI({
-  apiKey: import.meta.env.VITE_GEMINI_API_KEY
-});
+const callAI = async () => {
+  if (!inputText && !selectedImage) return;
+  if (loading) return;
 
-      const parts: any[] = [{ 
-        text: `Bạn là trợ lý EduHealth AI. Nhiệm vụ: Sàng lọc giáo dục sức khỏe (Truyền nhiễm, Da liễu, Mắt).
-        Cấm chẩn đoán xác định. Dùng cụm từ "Gợi ý", "Liên quan", "Khả năng cao là".
-        Mô tả: ${inputText}.
-        Nếu có ảnh, hãy phân tích kỹ dấu hiệu lâm sàng.` 
-      }];
-      
-      if (selectedImage) {
-        parts.push({ inlineData: { mimeType: "image/jpeg", data: selectedImage.split(',')[1] } });
-      }
+  setLoading(true);
+  setAiResult(null);
+  setShowHeatmap(false);
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: { parts },
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              analysis: { type: Type.ARRAY, items: { type: Type.STRING } },
-              urgency: { type: Type.STRING, enum: Object.values(UrgencyLevel) },
-              dangerSigns: { type: Type.ARRAY, items: { type: Type.STRING } },
-              safetyAdvice: { type: Type.ARRAY, items: { type: Type.STRING } },
-            },
-            required: ["title", "analysis", "urgency", "dangerSigns", "safetyAdvice"]
-          }
-        }
-      });
-      setAiResult(JSON.parse(response.text || '{}'));
-    } catch (e) {
-      alert("Lỗi kết nối AI. Vui lòng thử lại.");
-    } finally { setLoading(false); }
-  };
+  try {
+    const res = await fetch("/api/analyze-skin", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        inputText,
+        imageBase64: selectedImage || "",
+      }),
+    });
 
-  const callChat = async (text: string) => {
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || "Lỗi kết nối AI. Vui lòng thử lại.");
+    }
+
+    setAiResult(data);
+  } catch (e: any) {
+    alert(e.message || "Lỗi kết nối AI. Vui lòng thử lại.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+const callChat = async (text: string) => {
+  if (!text?.trim()) return;
+  if (chatLoading) return;
+
   console.log("CHATBOT CALLED ✅", text);
   setChatLoading(true);
   setChatMessages(prev => [...prev, { role: "user", content: text }]);
 
   try {
-    const ai = new GoogleGenAI({
-      apiKey: import.meta.env.VITE_GEMINI_API_KEY
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ text, userRole }),
     });
 
-    const parts = [{
-  text: `Bạn là Trợ lý EduHealth AI – chatbot giáo dục sức khỏe học đường.
-KHÔNG chẩn đoán bệnh.
-Trả lời dễ hiểu, ngắn gọn.
-Luôn nhắc dấu hiệu nguy hiểm cần đi khám.
+    const data = await res.json();
 
-Câu hỏi của người dùng:
-${text}
-`
-}];
-console.log(`TEST TEMPLATE: ${text}`);
+    if (!res.ok) {
+      throw new Error(data.error || "Lỗi kết nối.");
+    }
 
-
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [{ parts }]
-    });
-
-    const reply =
-  (typeof (response as any).text === "function"
-    ? (response as any).text()
-    : (response as any).text) || 
-  (response as any).candidates?.[0]?.content?.parts?.map((p: any) => p.text).join("") ||
-  "Mình chưa có thông tin phù hợp.";
-    console.log("RAW RESPONSE:", response);
-    console.log("REPLY:", reply);
-
-
-    setChatMessages(prev => [...prev, { role: "assistant", content: reply }]);
-  } catch (e) {
+    setChatMessages(prev => [
+      ...prev,
+      {
+        role: "assistant",
+        content: data.reply || "Mình chưa có thông tin phù hợp.",
+      },
+    ]);
+  } catch (e: any) {
     console.error("CHATBOT ERROR:", e);
-    setChatMessages(prev => [...prev, { role: "assistant", content: "Lỗi kết nối." }]);
+    setChatMessages(prev => [
+      ...prev,
+      {
+        role: "assistant",
+        content: e.message || "Lỗi kết nối.",
+      },
+    ]);
   } finally {
     setChatLoading(false);
   }
 };
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50 font-sans pb-24 selection:bg-blue-100 overflow-x-hidden relative">
@@ -938,24 +922,39 @@ console.log(`TEST TEMPLATE: ${text}`);
           </div>
 
           <div className="p-8 bg-gradient-to-r from-slate-50 to-white border-t border-slate-100 flex gap-4">
-            <div className="flex-1 relative">
-              <input
-                type="text"
-                disabled={!userRole || chatLoading}
-                placeholder="Nhập tin nhắn của bạn..."
-                className="w-full bg-white rounded-3xl px-8 py-5 text-sm font-medium outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-400 transition-all shadow-lg border-2 border-slate-200 disabled:opacity-50"
-                onKeyDown={(e) => { if (e.key === 'Enter' && e.currentTarget.value) { callChat(e.currentTarget.value); e.currentTarget.value = ''; } }}
-              />
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
-                <MessageSquare size={18} />
-              </div>
-            </div>
-            <button
-              disabled={!userRole || chatLoading}
-              className="bg-gradient-to-r from-blue-600 to-teal-600 text-white p-5 rounded-3xl shadow-xl shadow-blue-200 hover:shadow-blue-300 disabled:opacity-50 transition-all active:scale-95"
-            >
-              <Send size={24} />
-            </button>
+  <div className="flex-1 relative">
+    <input
+      id="chat-input"
+      type="text"
+      disabled={!userRole || chatLoading}
+      placeholder="Nhập tin nhắn của bạn..."
+      className="w-full bg-white rounded-3xl px-8 py-5 text-sm font-medium outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-400 transition-all shadow-lg border-2 border-slate-200 disabled:opacity-50"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && e.currentTarget.value) {
+          callChat(e.currentTarget.value);
+          e.currentTarget.value = '';
+        }
+      }}
+    />
+    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
+      <MessageSquare size={18} />
+    </div>
+  </div>
+
+  <button
+    onClick={() => {
+      const input = document.getElementById("chat-input") as HTMLInputElement | null;
+      if (input?.value) {
+        callChat(input.value);
+        input.value = "";
+      }
+    }}
+    disabled={!userRole || chatLoading}
+    className="bg-gradient-to-r from-blue-600 to-teal-600 text-white p-5 rounded-3xl shadow-xl shadow-blue-200 hover:shadow-blue-300 disabled:opacity-50 transition-all active:scale-95"
+  >
+    <Send size={24} />
+  </button>
+</div>
           </div>
         </div>
       )}
