@@ -19,12 +19,15 @@ export interface HealbookTopic {
   schoolContext: string;
   dangerSigns: string[];
   safeActions: string[];
-  references: { title: string; url: string }[];
+  references: {
+    title: string;
+    url: string;
+  }[];
   samplePrompt: string;
 }
 
 export interface HealthCase {
-  id: string;
+  id?: string;
   title: string;
   category: string;
   analysis: string[];
