@@ -903,7 +903,7 @@ const callChat = async (text: string) => {
                             </div>
                           </div>
                         )}
-                        {msg.content ?? msg.text}
+                        {msg.content}
                       </div>
                     </div>
                   ))}
