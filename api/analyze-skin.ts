@@ -1,103 +1,98 @@
-import { GoogleGenAI } from '@google/genai';
+import OpenAI from "openai";
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GOOGLE_API_KEY,
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
-function extractBase64Data(dataUrl: string) {
-  const match = dataUrl.match(/^data:(.+);base64,(.+)$/);
-  if (!match) return null;
-  return {
-    mimeType: match[1],
-    data: match[2],
-  };
-}
-
 export default async function handler(req: any, res: any) {
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
-  if (!process.env.GOOGLE_API_KEY) {
-    return res.status(500).json({ error: 'Thiếu GOOGLE_API_KEY trên Vercel.' });
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(500).json({ error: "Thiếu OPENAI_API_KEY trong Vercel." });
   }
 
   try {
     const { inputText, imageBase64 } = req.body ?? {};
 
     if (!inputText && !imageBase64) {
-      return res.status(400).json({ error: 'Thiếu dữ liệu mô tả hoặc ảnh.' });
+      return res.status(400).json({ error: "Thiếu dữ liệu đầu vào." });
     }
 
-    const parts: any[] = [];
+    const content: any[] = [
+      {
+        type: "input_text",
+        text:
+          `Bạn là AI hỗ trợ sàng lọc sức khỏe học đường.
+Hãy trả về DUY NHẤT JSON hợp lệ, không có markdown, không có giải thích ngoài JSON.
 
-    const instruction = `
-Bạn là AI hỗ trợ sàng lọc sức khỏe học đường bằng tiếng Việt.
-Nhiệm vụ:
-- Không chẩn đoán chắc chắn.
-- Chỉ đưa ra đánh giá sàng lọc ban đầu.
-- Nếu có dấu hiệu nguy hiểm, ưu tiên mức URGENT_DOCTOR.
-- Trả về JSON hợp lệ, không markdown, không giải thích ngoài JSON.
-
-Schema JSON bắt buộc:
+Schema bắt buộc:
 {
   "title": "string",
   "category": "string",
-  "analysis": ["string", "string", "string"],
-  "urgency": "HOME_MONITOR | SEE_SCHOOL_HEALTH | URGENT_DOCTOR",
-  "dangerSigns": ["string", "string"],
-  "safetyAdvice": ["string", "string", "string"]
+  "analysis": ["string", "string"],
+  "urgency": "Theo dõi & Vệ sinh tại nhà" | "Nên tham vấn Y tế học đường" | "Cần đi khám chuyên khoa ngay",
+  "dangerSigns": ["string"],
+  "safetyAdvice": ["string"]
 }
 
-Quy ước urgency:
-- HOME_MONITOR
-- SEE_SCHOOL_HEALTH
-- URGENT_DOCTOR
-`.trim();
-
-    parts.push({ text: instruction });
+Nguyên tắc:
+- Không chẩn đoán chắc chắn.
+- Nếu thông tin không đủ, vẫn đưa ra nhận định thận trọng.
+- Nếu nghi ngờ nặng, chọn mức: "Cần đi khám chuyên khoa ngay".
+- Viết bằng tiếng Việt, dễ hiểu cho học sinh/phụ huynh.`
+      }
+    ];
 
     if (inputText) {
-      parts.push({
-        text: `Mô tả người dùng: ${inputText}`,
+      content.push({
+        type: "input_text",
+        text: `Mô tả triệu chứng: ${String(inputText)}`
       });
     }
 
-    if (imageBase64) {
-      const parsed = extractBase64Data(imageBase64);
-      if (parsed) {
-        parts.push({
-          inlineData: {
-            mimeType: parsed.mimeType,
-            data: parsed.data,
-          },
-        });
-      }
+    if (imageBase64 && typeof imageBase64 === "string") {
+      content.push({
+        type: "input_image",
+        image_url: imageBase64
+      });
     }
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: [{ role: 'user', parts }],
+    const response = await client.responses.create({
+      model: "gpt-4o-mini",
+      input: [
+        {
+          role: "user",
+          content
+        }
+      ]
     });
 
-    const raw = response.text?.trim() || '';
+    const raw = response.output_text?.trim() || "";
 
-    let cleaned = raw;
-    if (cleaned.startsWith('```json')) {
-      cleaned = cleaned.replace(/^```json/, '').replace(/```$/, '').trim();
-    } else if (cleaned.startsWith('```')) {
-      cleaned = cleaned.replace(/^```/, '').replace(/```$/, '').trim();
+    let parsed: any;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      console.error("RAW ANALYZE RESPONSE:", raw);
+      return res.status(500).json({
+        error: "AI không trả về JSON hợp lệ."
+      });
     }
 
-    const parsed = JSON.parse(cleaned);
-
-    return res.status(200).json(parsed);
+    return res.status(200).json({
+      title: parsed.title || "Kết quả sàng lọc sơ bộ",
+      category: parsed.category || "Chưa xác định",
+      analysis: Array.isArray(parsed.analysis) ? parsed.analysis : ["Chưa đủ dữ liệu để phân tích sâu."],
+      urgency: parsed.urgency || "Nên tham vấn Y tế học đường",
+      dangerSigns: Array.isArray(parsed.dangerSigns) ? parsed.dangerSigns : ["Nếu triệu chứng tăng nặng, hãy đi khám."],
+      safetyAdvice: Array.isArray(parsed.safetyAdvice) ? parsed.safetyAdvice : ["Theo dõi thêm và tham khảo nhân viên y tế."]
+    });
   } catch (error: any) {
-    console.error('ANALYZE SKIN API ERROR:', error);
+    console.error("ANALYZE API ERROR:", error);
     return res.status(500).json({
-      error: error?.message || 'Lỗi server analyze-skin.',
+      error: error?.message || "Lỗi máy chủ khi phân tích ảnh."
     });
   }
 }
