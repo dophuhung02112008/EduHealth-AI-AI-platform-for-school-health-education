@@ -272,32 +272,33 @@ const callAI = async () => {
   setShowHeatmap(false);
 
   try {
-    const res = await fetch('/api/analyze-skin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await fetch("/api/analyze-skin", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         inputText,
-        imageBase64: selectedImage || '',
+        imageBase64: selectedImage || "",
       }),
     });
 
-    const raw = await res.text();
-
+    const text = await res.text();
     let data: any = {};
+
     try {
-      data = JSON.parse(raw);
+      data = JSON.parse(text);
     } catch {
-      throw new Error(raw || 'API không trả về JSON hợp lệ.');
+      throw new Error(text || "API trả về dữ liệu không hợp lệ.");
     }
 
     if (!res.ok) {
-      throw new Error(data.error || 'Lỗi kết nối AI.');
+      throw new Error(data.error || "Lỗi kết nối AI. Vui lòng thử lại.");
     }
 
     setAiResult(data);
   } catch (e: any) {
-    console.error('AI SCAN ERROR:', e);
-    alert(e.message || 'Lỗi kết nối AI.');
+    alert(e.message || "Lỗi kết nối AI. Vui lòng thử lại.");
   } finally {
     setLoading(false);
   }
@@ -308,43 +309,39 @@ const callChat = async (text: string) => {
   if (chatLoading) return;
 
   setChatLoading(true);
-  setChatMessages((prev) => [...prev, { role: 'user', content: text }]);
+  setChatMessages(prev => [...prev, { role: "user", content: text }]);
 
   try {
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ text, userRole }),
     });
 
     const raw = await res.text();
-
     let data: any = {};
+
     try {
       data = JSON.parse(raw);
     } catch {
-      throw new Error(raw || 'API không trả về JSON hợp lệ.');
+      throw new Error(raw || "API trả về dữ liệu không hợp lệ.");
     }
 
     if (!res.ok) {
-      throw new Error(data.error || 'Lỗi kết nối chatbot.');
+      throw new Error(data.error || "Lỗi kết nối.");
     }
 
-    setChatMessages((prev) => [
+    setChatMessages(prev => [
       ...prev,
-      {
-        role: 'assistant',
-        content: data.reply || 'Mình chưa có thông tin phù hợp.',
-      },
+      { role: "assistant", content: data.reply || "Mình chưa có thông tin phù hợp." },
     ]);
   } catch (e: any) {
-    console.error('CHATBOT ERROR:', e);
-    setChatMessages((prev) => [
+    console.error("CHATBOT ERROR:", e);
+    setChatMessages(prev => [
       ...prev,
-      {
-        role: 'assistant',
-        content: e.message || 'Lỗi kết nối.',
-      },
+      { role: "assistant", content: e.message || "Lỗi kết nối." },
     ]);
   } finally {
     setChatLoading(false);
