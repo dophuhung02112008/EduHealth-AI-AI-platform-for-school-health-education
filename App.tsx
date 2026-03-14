@@ -272,26 +272,32 @@ const callAI = async () => {
   setShowHeatmap(false);
 
   try {
-    const res = await fetch("/api/analyze-skin", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+    const res = await fetch('/api/analyze-skin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         inputText,
-        imageBase64: selectedImage || "",
+        imageBase64: selectedImage || '',
       }),
     });
 
-    const data = await res.json();
+    const raw = await res.text();
+
+    let data: any = {};
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      throw new Error(raw || 'API không trả về JSON hợp lệ.');
+    }
 
     if (!res.ok) {
-      throw new Error(data.error || "Lỗi kết nối AI. Vui lòng thử lại.");
+      throw new Error(data.error || 'Lỗi kết nối AI.');
     }
 
     setAiResult(data);
   } catch (e: any) {
-    alert(e.message || "Lỗi kết nối AI. Vui lòng thử lại.");
+    console.error('AI SCAN ERROR:', e);
+    alert(e.message || 'Lỗi kết nối AI.');
   } finally {
     setLoading(false);
   }
@@ -301,39 +307,43 @@ const callChat = async (text: string) => {
   if (!text?.trim()) return;
   if (chatLoading) return;
 
-  console.log("CHATBOT CALLED ✅", text);
   setChatLoading(true);
-  setChatMessages(prev => [...prev, { role: "user", content: text }]);
+  setChatMessages((prev) => [...prev, { role: 'user', content: text }]);
 
   try {
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, userRole }),
     });
 
-    const data = await res.json();
+    const raw = await res.text();
 
-    if (!res.ok) {
-      throw new Error(data.error || "Lỗi kết nối.");
+    let data: any = {};
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      throw new Error(raw || 'API không trả về JSON hợp lệ.');
     }
 
-    setChatMessages(prev => [
+    if (!res.ok) {
+      throw new Error(data.error || 'Lỗi kết nối chatbot.');
+    }
+
+    setChatMessages((prev) => [
       ...prev,
       {
-        role: "assistant",
-        content: data.reply || "Mình chưa có thông tin phù hợp.",
+        role: 'assistant',
+        content: data.reply || 'Mình chưa có thông tin phù hợp.',
       },
     ]);
   } catch (e: any) {
-    console.error("CHATBOT ERROR:", e);
-    setChatMessages(prev => [
+    console.error('CHATBOT ERROR:', e);
+    setChatMessages((prev) => [
       ...prev,
       {
-        role: "assistant",
-        content: e.message || "Lỗi kết nối.",
+        role: 'assistant',
+        content: e.message || 'Lỗi kết nối.',
       },
     ]);
   } finally {
@@ -829,134 +839,151 @@ const callChat = async (text: string) => {
 
       {/* CHATBOT GUIDED UI */}
       {showChat && (
-        <div className="fixed inset-0 sm:inset-auto sm:bottom-24 sm:right-6 sm:w-[450px] sm:h-[680px] bg-white sm:rounded-[3rem] shadow-2xl border border-slate-100 z-[60] flex flex-col overflow-hidden animate-in slide-in-from-right-10 duration-500 backdrop-blur-xl">
-          <div className="bg-gradient-to-r from-blue-600 via-teal-600 to-blue-700 p-10 text-white relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
-            <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/10 rounded-full blur-xl"></div>
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="bg-white/20 p-3 rounded-2xl shadow-lg backdrop-blur-sm">
-                  <MessageSquare size={24} />
+  <div className="fixed inset-0 sm:inset-auto sm:bottom-24 sm:right-6 sm:w-[450px] sm:h-[680px] bg-white sm:rounded-[3rem] shadow-2xl border border-slate-100 z-[60] flex flex-col overflow-hidden animate-in slide-in-from-right-10 duration-500 backdrop-blur-xl">
+    <div className="bg-gradient-to-r from-blue-600 via-teal-600 to-blue-700 p-10 text-white relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
+      <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/10 rounded-full blur-xl"></div>
+      <div className="relative z-10 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="bg-white/20 p-3 rounded-2xl shadow-lg backdrop-blur-sm">
+            <MessageSquare size={24} />
+          </div>
+          <div>
+            <h4 className="font-black text-lg leading-tight">Cố vấn EduHealth</h4>
+            <p className="text-xs font-bold uppercase tracking-widest opacity-80">
+              Luôn sẵn sàng hỗ trợ 24/7
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowChat(false)}
+          className="hover:bg-white/20 p-3 rounded-2xl transition-all duration-200 backdrop-blur-sm"
+        >
+          <X size={24} />
+        </button>
+      </div>
+    </div>
+
+    <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-gradient-to-b from-slate-50/80 to-white no-scrollbar">
+      {!userRole ? (
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="text-center space-y-4 mb-10">
+            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-teal-500 rounded-3xl flex items-center justify-center mx-auto shadow-xl shadow-blue-200">
+              <HeartPulse size={32} className="text-white" />
+            </div>
+            <h3 className="text-xl font-black text-slate-800">Chào bạn! 👋</h3>
+            <p className="text-sm font-medium text-slate-600 leading-relaxed">
+              Rất vui được gặp bạn. Tôi là trợ lý EduHealth AI, chuyên hỗ trợ sức khỏe học đường.
+            </p>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+              Vui lòng chọn vai trò để tôi hỗ trợ tốt nhất
+            </p>
+          </div>
+
+          {(['Học sinh', 'Phụ huynh', 'Cán bộ y tế'] as UserRole[]).map((r) => (
+            <button
+              key={r}
+              onClick={() => setUserRole(r)}
+              className="w-full bg-white border-2 border-slate-200 p-6 rounded-3xl text-base font-black text-slate-700 hover:border-blue-400 hover:text-blue-600 hover:shadow-2xl hover:shadow-blue-100 hover:-translate-y-1 transition-all duration-300 flex items-center justify-between group shadow-lg"
+            >
+              <span className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                  {r === 'Học sinh' ? '🎓' : r === 'Phụ huynh' ? '👨‍👩‍👧‍👦' : '🏥'}
                 </div>
-                <div>
-                   <h4 className="font-black text-lg leading-tight">Cố vấn EduHealth</h4>
-                   <p className="text-xs font-bold uppercase tracking-widest opacity-80">Luôn sẵn sàng hỗ trợ 24/7</p>
+                {r}
+              </span>
+              <ChevronRight
+                size={20}
+                className="opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"
+              />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <>
+          <div className="flex justify-start animate-in slide-in-from-left-4 duration-300">
+            <div className="max-w-[85%] p-6 rounded-3xl rounded-tl-md text-sm shadow-lg bg-gradient-to-r from-blue-50 to-teal-50 text-slate-700 border border-blue-100 font-medium leading-relaxed">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                  <span className="text-xs text-white font-bold">AI</span>
                 </div>
+                <span className="text-xs font-bold text-blue-600 uppercase tracking-widest">
+                  EduHealth AI
+                </span>
               </div>
-              <button onClick={() => setShowChat(false)} className="hover:bg-white/20 p-3 rounded-2xl transition-all duration-200 backdrop-blur-sm">
-                <X size={24} />
-              </button>
+              Chào {userRole}! Tôi là EduHealth AI. Bạn cần tra cứu thông tin hay tư vấn về tình trạng sức khỏe học đường nào?
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-gradient-to-b from-slate-50/80 to-white no-scrollbar">
-             {!userRole ? (
-                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                   <div className="text-center space-y-4 mb-10">
-                      <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-teal-500 rounded-3xl flex items-center justify-center mx-auto shadow-xl shadow-blue-200">
-                        <HeartPulse size={32} className="text-white" />
-                      </div>
-                      <h3 className="text-xl font-black text-slate-800">Chào bạn! 👋</h3>
-                      <p className="text-sm font-medium text-slate-600 leading-relaxed">Rất vui được gặp bạn. Tôi là trợ lý EduHealth AI, chuyên hỗ trợ sức khỏe học đường.</p>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Vui lòng chọn vai trò để tôi hỗ trợ tốt nhất</p>
-                   </div>
-                   {(['Học sinh', 'Phụ huynh', 'Cán bộ y tế'] as UserRole[]).map(r => (
-                      <button
-                        key={r}
-                        onClick={() => setUserRole(r)}
-                        className="w-full bg-white border-2 border-slate-200 p-6 rounded-3xl text-base font-black text-slate-700 hover:border-blue-400 hover:text-blue-600 hover:shadow-2xl hover:shadow-blue-100 hover:-translate-y-1 transition-all duration-300 flex items-center justify-between group shadow-lg"
-                      >
-                         <span className="flex items-center gap-3">
-                           <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                             {r === 'Học sinh' ? '🎓' : r === 'Phụ huynh' ? '👨‍👩‍👧‍👦' : '🏥'}
-                           </div>
-                           {r}
-                         </span>
-                         <ChevronRight size={20} className="opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                      </button>
-                   ))}
-                </div>
-             ) : (
-                <>
-                  <div className="flex justify-start animate-in slide-in-from-left-4 duration-300">
-                    <div className="max-w-[85%] p-6 rounded-3xl rounded-tl-md text-sm shadow-lg bg-gradient-to-r from-blue-50 to-teal-50 text-slate-700 border border-blue-100 font-medium leading-relaxed">
-                       <div className="flex items-center gap-2 mb-2">
-                         <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                           <span className="text-xs text-white font-bold">AI</span>
-                         </div>
-                         <span className="text-xs font-bold text-blue-600 uppercase tracking-widest">EduHealth AI</span>
-                       </div>
-                       Chào {userRole}! Tôi là EduHealth AI. Bạn cần tra cứu thông tin hay tư vấn về tình trạng sức khỏe học đường nào?
-                    </div>
-                  </div>
-                  {chatMessages.map((msg, i) => (
-                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-${msg.role === 'user' ? 'right' : 'left'}-4 duration-300`}>
-                      <div className={`max-w-[85%] p-5 rounded-3xl text-sm shadow-lg whitespace-pre-wrap ${
-                        msg.role === 'user'
-                          ? 'bg-gradient-to-r from-blue-600 to-teal-600 text-white rounded-br-md'
-                          : 'bg-white text-slate-700 border border-slate-100 rounded-bl-md'
-                      }`}>
-                        {msg.role === 'user' && (
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="w-5 h-5 bg-white/20 rounded-full flex items-center justify-center">
-                              <span className="text-xs text-blue-600 font-bold">Bạn</span>
-                            </div>
-                          </div>
-                        )}
-                        {msg.content}
-                      </div>
-                    </div>
-                  ))}
-                  {chatLoading && (
-                    <div className="flex justify-start animate-in fade-in duration-300">
-                       <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-lg flex items-center gap-4">
-                          <div className="w-8 h-8 bg-blue-100 rounded-2xl flex items-center justify-center">
-                            <Loader2 size={20} className="animate-spin text-blue-600" />
-                          </div>
-                          <span className="text-sm font-black text-slate-400 uppercase tracking-widest">Đang trả lời...</span>
-                       </div>
-                    </div>
-                  )}
-                </>
-             )}
-          </div>
+          {chatMessages.map((msg, i) => (
+            <div
+              key={i}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`max-w-[85%] p-5 rounded-3xl text-sm shadow-lg whitespace-pre-wrap ${
+                  msg.role === 'user'
+                    ? 'bg-gradient-to-r from-blue-600 to-teal-600 text-white rounded-br-md'
+                    : 'bg-white text-slate-700 border border-slate-100 rounded-bl-md'
+                }`}
+              >
+                {msg.content}
+              </div>
+            </div>
+          ))}
 
-          <div className="p-8 bg-gradient-to-r from-slate-50 to-white border-t border-slate-100 flex gap-4">
-  <div className="flex-1 relative">
-    <input
-      id="chat-input"
-      type="text"
-      disabled={!userRole || chatLoading}
-      placeholder="Nhập tin nhắn của bạn..."
-      className="w-full bg-white rounded-3xl px-8 py-5 text-sm font-medium outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-400 transition-all shadow-lg border-2 border-slate-200 disabled:opacity-50"
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' && e.currentTarget.value) {
-          callChat(e.currentTarget.value);
-          e.currentTarget.value = '';
-        }
-      }}
-    />
-    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
-      <MessageSquare size={18} />
+          {chatLoading && (
+            <div className="flex justify-start animate-in fade-in duration-300">
+              <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-lg flex items-center gap-4">
+                <div className="w-8 h-8 bg-blue-100 rounded-2xl flex items-center justify-center">
+                  <Loader2 size={20} className="animate-spin text-blue-600" />
+                </div>
+                <span className="text-sm font-black text-slate-400 uppercase tracking-widest">
+                  Đang trả lời...
+                </span>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+
+    <div className="p-8 bg-gradient-to-r from-slate-50 to-white border-t border-slate-100 flex gap-4">
+      <div className="flex-1 relative">
+        <input
+          id="chat-input"
+          type="text"
+          disabled={!userRole || chatLoading}
+          placeholder="Nhập tin nhắn của bạn..."
+          className="w-full bg-white rounded-3xl px-8 py-5 text-sm font-medium outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-400 transition-all shadow-lg border-2 border-slate-200 disabled:opacity-50"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && e.currentTarget.value) {
+              callChat(e.currentTarget.value);
+              e.currentTarget.value = '';
+            }
+          }}
+        />
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
+          <MessageSquare size={18} />
+        </div>
+      </div>
+
+      <button
+        onClick={() => {
+          const input = document.getElementById('chat-input') as HTMLInputElement | null;
+          if (input?.value) {
+            callChat(input.value);
+            input.value = '';
+          }
+        }}
+        disabled={!userRole || chatLoading}
+        className="bg-gradient-to-r from-blue-600 to-teal-600 text-white p-5 rounded-3xl shadow-xl shadow-blue-200 hover:shadow-blue-300 disabled:opacity-50 transition-all active:scale-95"
+      >
+        <Send size={24} />
+      </button>
     </div>
   </div>
-
-  <button
-    onClick={() => {
-      const input = document.getElementById("chat-input") as HTMLInputElement | null;
-      if (input?.value) {
-        callChat(input.value);
-        input.value = "";
-      }
-    }}
-    disabled={!userRole || chatLoading}
-    className="bg-gradient-to-r from-blue-600 to-teal-600 text-white p-5 rounded-3xl shadow-xl shadow-blue-200 hover:shadow-blue-300 disabled:opacity-50 transition-all active:scale-95"
-  >
-    <Send size={24} />
-  </button>
-</div>
-        </div>
-      )}
+)}
       {/* FOOTER NAV */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-slate-200 px-8 py-4 z-50">
         <div className="max-w-md mx-auto flex justify-between items-center">
